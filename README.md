@@ -1,12 +1,12 @@
 # ME 3310 — IMU Motion Analyzer (Week 11–12)
 
-> **Status: v0.1 prototype — MATLAB execution and actual PocketLab data import have not yet been verified.** Test with `ME3310_selftest` and real student-format MAT files before class deployment.
+> **Status: v0.2 beta.** The instructor has run `ME3310_selftest` successfully and imported six real PocketLab forward/backward walking recordings into the GUI (October 31, 2026). The latest output-folder and figure-export changes have **not yet** been rerun in MATLAB; validate them before classroom distribution.
 
 Related lecture demonstrations: https://github.com/stargaze221/ME3310-Motion-Classification
 
 **Purpose:** Convert *actual* PocketLab Voyager MAT recordings of Target and Confusing Motion to 16-dimensional trial feature vectors, then compare 2D/4D/8D/12D/16D **linear nearest-centroid classifiers**. The MATLAB GUI supplies the arithmetic and plots; students supply the measurement design, feature rationale, ranking, and engineering judgment.
 
-## Before tomorrow's real-data check
+## Recommended measurement settings
 
 Recommended **initial**, not compulsory, acquisition settings:
 
@@ -23,6 +23,48 @@ Recommended **initial**, not compulsory, acquisition settings:
 
 Frequency-domain details: at 20 Hz, Nyquist is 10 Hz and a 3-s window resolves variations only at roughly 0.33-Hz scale, even though FFT zero padding produces a visually denser PSD curve. The existing USC-HAD **100-Hz** example has 12–20 and 20–40 Hz features that are **not measurable at 20 Hz**. This tool uses an explicitly *adapted* PocketLab 16-feature set. Frequencies close to Nyquist, and especially narrow low-frequency bands, need cautious interpretation. Do not compare numeric Fisher scores across different acquisition protocols.
 
+## File organization and optional one-time cleanup
+
+The program source files stay in the repository root. Synthetic test data and model exports now default to the **ignored** `results/` tree:
+
+```text
+ME3310-IMU-Motion-Analyzer/
+  ME3310_IMU_Analyzer.m
+  ME3310_IMU_Core.m
+  ME3310_export_bundle.m
+  ME3310_generate_demo.m
+  ME3310_selftest.m
+  ME3310_organize_existing.m
+  README.md
+  .gitignore
+  results/                                # ignored by Git
+    DEMO_SYNTHETIC_NOT_EXPERIMENTAL_DATA/
+    Week11_Target_vs_Confusing/
+      ME3310_Week11_Model.mat
+      ME3310_Week11_Model_metadata.txt
+      ME3310_Week11_Model_trial_features.csv
+      ME3310_Week11_Model_trial_predictions.csv
+      ME3310_Week11_Model_feature_view.png
+      ME3310_Week11_Model_accuracy_comparison.png
+      ME3310_Week11_Model_source_MAT/
+    Week12_Target_vs_Confusing/
+```
+
+Use **Experiment Notes** to enter explicit motion names before exporting if you want a more descriptive folder than `Target_vs_Confusing`. The Save dialog allows choosing another destination, but the recommended default is under `results/`.
+
+If you already exported to the **repository root** with an older version, run this optional one-time migration:
+
+```matlab
+cd('C:\\Users\\hyoon\\Documents\\MATLAB\\ME3310-IMU-Motion-Analyzer')
+ME3310_organize_existing
+```
+
+It relocates known `ME3310_Week11_Model*` / `ME3310_Week12_Validation*` outputs into `results/Legacy_Week11_Model/` or `results/Legacy_Week12_Validation/`, along with an old synthetic demo folder if the new location is not occupied. It **never overwrites** existing destinations. It does **not** move original data stored in your separate PocketLab driver repository. Legacy metadata and model files retain historical absolute paths; if you need a newly self-consistent archive, re-export from the GUI after running the updated code.
+
+**Number of trials:** There is no fixed upper count of imported MAT recordings. At least two **training trials per class** and one **holdout trial per class** are needed. By default, the third and subsequent recording of each class is labeled Holdout, and students may modify those roles before fitting. One original recording (irrespective of sliding windows) counts as one trial. Available memory and plot/table responsiveness set practical limits.
+
+**Safety/accuracy:** Do not globally disable MATLAB warnings. Known unit labels are informational; invalid sensor channels, mismatched units, sampling-rate inconsistency, and reused Week 11 paths on Week 12 remain errors. If PNG export fails in a MATLAB version, that failure is recorded without aborting model/metadata/CSV exports.
+
 ## Files
 
 - `ME3310_IMU_Analyzer.m` — interactive MATLAB GUI.
@@ -30,6 +72,7 @@ Frequency-domain details: at 20 Hz, Nyquist is 10 Hz and a 3-s window resolves v
 - `ME3310_export_bundle.m` — human-readable metadata TXT, ML model MAT, feature/prediction CSV, and archived original MAT recordings.
 - `ME3310_generate_demo.m` — optional **synthetic** `.mat` files to test GUI import, distinct from experimental evidence.
 - `ME3310_selftest.m` — MATLAB unit/smoke test on synthetic data (must be run in MATLAB).
+- `ME3310_organize_existing.m` — optional one-time cleanup of older exports from the repository root, without deleting or overwriting student data.
 
 ## Quick import of PocketLab live recordings (no conversion)
 
@@ -38,6 +81,7 @@ Frequency-domain details: at 20 Hz, Nyquist is 10 Hz and a 3-s window resolves v
 
 ```matlab
 repo = gitrepo; pull(repo); % run from the Analyzer's repository folder
+clear ME3310_IMU_Analyzer ME3310_IMU_Core ME3310_export_bundle ME3310_selftest
 ME3310_selftest
 ME3310_IMU_Analyzer
 ```
@@ -66,7 +110,7 @@ numel(S.t)
 6. Choose feature profile and the common window/hop. Optionally click **Rank by Fisher (train)** before fitting; this does not use the held-out trials. Click **Fit + Eval (Week 11)**. Each MAT file contributes one 16D feature vector, formed by averaging feature values over its overlapping windows.
 7. Before fitting and revealing the holdout, inspect **Fisher scores (training only)** and move individual features up/down to choose the ranked 16 features. The GUI prevents feature re-ranking once the holdout evaluation has been displayed. A changed model requires fresh independent evaluation data.
 8. Compare **2D, 4D, 8D, 12D, 16D** accuracy. The 2D pane visualizes a linear decision boundary. The other dimensions use the identical class-centroid linear decision rule. Training and preliminary independent-trial results are shown separately.
-9. Click **Export ML + Metadata**. This produces a model/analysis MAT, an especially detailed human-readable `*_metadata.txt`, training/independent CSV tables, the trial manifest, 16 trial features, per-trial predictions (TP/FP/TN/FN and scores), dashboard PNG, and **copies of the original MAT recordings**.
+9. Click **Export ML + Metadata**. By default, the save dialog opens inside `results/Week11_Target_vs_Confusing/` (or a motion-specific name if Experiment Notes are provided). The export includes the model/analysis MAT, `*_metadata.txt`, CSV tables, a feature-view PNG and an accuracy-comparison PNG (if supported by MATLAB), and copies of the original MAT recordings. If graph exporting fails, the issue is recorded in metadata and the GUI status rather than repeatedly printed as a warning stack.
 10. In Week 12, click **Load Saved Models**, then import **NEW** independently recorded Target/Confusing trials. Click **Evaluate NEW (Week 12)**. The feature ranking, normalization parameters, linear coefficients, and acquisition protocol remain frozen. Save Week 12 results separately.
 
 ## Expected input MAT schema
@@ -82,7 +126,7 @@ data.gyroscope      % N x 3, angular velocity X/Y/Z
 info                % optional driver metadata
 ```
 
-The original PocketLab file is imported directly into the Analyzer. The driver uses nominal timestamps rather than independently verified sensor hardware times. Check sample count and sensor units before interpretation.
+The original PocketLab file is imported directly into the Analyzer. The driver uses nominal timestamps rather than independently verified sensor hardware times. Sensor labels are taken from `info.Sensors` / `info.Units` when available: acceleration is validated in `g`, while gyroscope units may be `native` (not yet independently verified). The GUI stores unit labels in the trial audit and exported metadata without repeatedly warning about known native units. Inconsistent unit labels across different trials still cause an error.
 
 **Format B — standardized course trial** (same structure as the existing `examples/Student_IMU/load_student_trial.m` convention):
 
