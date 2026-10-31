@@ -3,7 +3,7 @@ function ME3310_generate_demo()
 % NOT observations and NOT valid course-project experimental evidence.
 % Generates 3 Target and 3 Confusing recordings in a separate folder.
 root=fileparts(mfilename('fullpath'));
-out=fullfile(root,'DEMO_SYNTHETIC_NOT_EXPERIMENTAL_DATA');
+out=fullfile(root,'results','DEMO_SYNTHETIC_NOT_EXPERIMENTAL_DATA');
 if ~exist(out,'dir'),mkdir(out);end
 rng(3310,'twister');
 fs=20;
