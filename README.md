@@ -1,6 +1,6 @@
 # ME 3310 — IMU Motion Analyzer (Week 11–12)
 
-> **Status: v0.2 beta.** The instructor has run `ME3310_selftest` successfully and imported six real PocketLab forward/backward walking recordings into the GUI (October 31, 2026). The latest output-folder and figure-export changes have **not yet** been rerun in MATLAB; validate them before classroom distribution.
+> **Status: v0.3 beta.** The instructor has run `ME3310_selftest` successfully and imported six real PocketLab forward/backward walking recordings into the GUI (October 31, 2026). The latest output-folder and figure-export changes have **not yet** been rerun in MATLAB; validate them before classroom distribution.
 
 Related lecture demonstrations: https://github.com/stargaze221/ME3310-Motion-Classification
 
@@ -73,6 +73,31 @@ It relocates known `ME3310_Week11_Model*` / `ME3310_Week12_Validation*` outputs 
 - `ME3310_generate_demo.m` — optional **synthetic** `.mat` files to test GUI import, distinct from experimental evidence.
 - `ME3310_selftest.m` — MATLAB unit/smoke test on synthetic data (must be run in MATLAB).
 - `ME3310_organize_existing.m` — optional one-time cleanup of older exports from the repository root, without deleting or overwriting student data.
+
+## Week 12 display and frozen-model checks
+
+After selecting **Load Saved Models**, the original Week 11 model, Fisher scores,
+feature priority, standardization and coefficients remain frozen.
+New Target/Confusing MAT recordings in the file list now display **New Eval**
+(not **Train**), and every imported recording is treated as new evaluation
+data. The Train/Holdout role chooser and Fisher ranking/reordering controls
+remain available for Week 11 development, but are not valid for a frozen
+Week 12 model.
+
+On Week 12, selecting **Fisher score ranking** shows the original **Week 11
+training Fisher scores**, not Fisher scores recalculated on the new trials.
+The 2D decision-boundary plot shows diamonds for new evaluation recordings;
+training circles are not displayed, because the current Week 12 plot does not
+include the original training feature vectors. The accuracy comparison uses
+**Week 11 train** versus **Week 12 NEW** labels, with the independent sample
+count printed. For small samples, even 100% is only preliminary evidence.
+
+If the GUI was open during a Git update, close it and rerun
+`clear ME3310_IMU_Analyzer` before launching it again. Previously saved
+Week 11 model MAT files remain compatible with these GUI display changes
+as long as the original saved model includes Fisher scores. If scores are
+absent, the GUI states they are unavailable rather than showing a different
+plot under the Fisher dropdown.
 
 ## Quick import of PocketLab live recordings (no conversion)
 
