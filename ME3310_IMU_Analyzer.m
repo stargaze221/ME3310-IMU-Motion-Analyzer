@@ -217,10 +217,9 @@ refreshRank();
             string(recordIDs),string(eventLabels), ...
             'VariableNames',{'SampleRateHz','DurationSeconds','NumWindows', ...
             'Resampled','AccelUnits','GyroUnits','MetadataID','MetadataEventLabel'});
-        if strcmp(uA{1},'not specified') || strcmp(uG{1},'not specified')
-            warning('ME3310:Units', ...
-                'Sensor units absent in MAT metadata; verify units manually.');
-        end
+        % Unit labels are retained in the audit and metadata export.
+        % Unknown/native gyro units are an interpretation limitation,
+        % not a repeated MATLAB warning. Different units still ERROR above.
     end
     function runFit(~,~)
       try
@@ -257,8 +256,12 @@ refreshRank();
             'unitGyro',audit.GyroUnits(1),'developmentFsRange', ...
             [min(fs(train)) max(fs(train))],'savedAt',char(datetime('now')));
         importedBundle=[];plotResults();
-        msg(sprintf('Week 11: %d TRAIN and %d HOLDOUT independent trials. Held-out accuracy is only preliminary. Fisher is TRAIN-ONLY. Fs range: %.2f-%.2f Hz.', ...
-            sum(train),sum(test),min(fs),max(fs)));
+        msg({sprintf(['Week 11: %d TRAIN / %d HOLDOUT trials. ' ...
+            'Fisher TRAIN-only; Fs %.2f-%.2f Hz.'], ...
+            sum(train),sum(test),min(fs),max(fs)), ...
+            sprintf('Sensor units: Accel %s; Gyro %s (native is unverified).', ...
+            char(audit.AccelUnits(1)),char(audit.GyroUnits(1))), ...
+            'A small holdout is preliminary evidence, not reliability proof.'});
       catch ME
         errordlg(ME.message,'Analysis failed');msg(['ERROR: ' ME.message]);
       end
@@ -424,19 +427,44 @@ refreshRank();
         if isempty(R) || isempty(modelBundle)
             error('ME3310:NoResults','Run analysis or Week 12 validation before saving.');
         end
-        if any(R.train),initial='ME3310_Week11_Model.mat';
-        else,initial='ME3310_Week12_Validation.mat';end
+        if any(R.train),initial='ME3310_Week11_Model.mat';stage='Week11';
+        else,initial='ME3310_Week12_Validation.mat';stage='Week12';end
+        % Default all exports to results/<stage>_<Target>_vs_<Confusing>.
+        % Allow students to choose a different location in the Save dialog.
+        toolRoot=fileparts(mfilename('fullpath'));
+        tagTarget=cleanFolderName(notes.TargetMotion,'Target');
+        tagConfusing=cleanFolderName(notes.ConfusingMotion,'Confusing');
+        resultFolder=fullfile(toolRoot,'results', ...
+            [stage '_' tagTarget '_vs_' tagConfusing]);
+        if ~isfolder(resultFolder),mkdir(resultFolder);end
+        suggested=fullfile(resultFolder,initial);
         [f,folder]=uiputfile('*.mat', ...
-            'Choose export name (also writes *_metadata.txt and CSVs)',initial);
+            'Export model, metadata, CSV, and plots to results folder',suggested);
         if isequal(f,0),return;end
         outputs=ME3310_export_bundle(fullfile(folder,f),modelBundle,R,...
             trials,axTop,axBottom);
-        msg({['EXPORTED: ' outputs.modelMAT], ...
-             ['Human-readable metadata: ' outputs.metadataTXT], ...
-             ['Frozen ML model, features, predictions, figures, and raw source MAT copies are archived.']});
+        messages={['EXPORTED: ' outputs.modelMAT], ...
+             ['Metadata: ' outputs.metadataTXT], ...
+             'Model, feature tables, predictions and original MAT copies saved.'};
+        if ~isempty(outputs.figureIssues)
+            messages{end+1}=['Plot PNG not exported: ' ...
+                strjoin(outputs.figureIssues,' | ')]; %#ok<AGROW>
+        end
+        msg(messages);
       catch ME
         errordlg(ME.message,'Export failed');msg(['ERROR: ' ME.message]);
       end
+    end
+    function tag=cleanFolderName(raw,fallback)
+        tag=regexprep(strtrim(char(raw)),'[^a-zA-Z0-9]+','_');
+        tag=regexprep(tag,'^_+|_+
+        set(hInfo,'String',lines);
+        drawnow limitrate;
+    end
+end
+,'');
+        if isempty(tag),tag=fallback;end
+        if numel(tag)>30,tag=tag(1:30);end
     end
     function msg(lines)
         if ischar(lines),lines={lines};end
