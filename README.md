@@ -55,7 +55,7 @@ Use **Experiment Notes** to enter explicit motion names before exporting if you 
 If you already exported to the **repository root** with an older version, run this optional one-time migration:
 
 ```matlab
-cd('C:\\Users\\hyoon\\Documents\\MATLAB\\ME3310-IMU-Motion-Analyzer')
+cd(fullfile(getenv('USERPROFILE'),'Documents','MATLAB','ME3310-IMU-Motion-Analyzer'))
 ME3310_organize_existing
 ```
 
