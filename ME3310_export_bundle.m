@@ -110,9 +110,28 @@ for k=1:n
     archiveFiles{k}=archived;
 end
 
-if nargin>=5 && ~isempty(axTop) && ishandle(axTop)
-    try,saveas(ancestor(axTop,'figure'),[base '_dashboard.png']);
-    catch,warning('ME3310:Figure','Unable to export dashboard screenshot.');end
+% Traditional MATLAB GUI widgets are not always supported by saveas.
+% Save plot axes individually; report failures as export status, not noisy
+% stack-trace warnings. Never claim a PNG exists unless it was written.
+figureFiles={};
+figureIssues={};
+if nargin>=5 && ~isempty(axTop) && isgraphics(axTop,'axes')
+    fileTop=[base '_feature_view.png'];
+    try
+        exportgraphics(axTop,fileTop,'Resolution',180);
+        if isfile(fileTop),figureFiles{end+1}=fileTop;end %#ok<AGROW>
+    catch ME
+        figureIssues{end+1}=['Feature view: ' ME.message]; %#ok<AGROW>
+    end
+end
+if nargin>=6 && ~isempty(axBottom) && isgraphics(axBottom,'axes')
+    fileBottom=[base '_accuracy_comparison.png'];
+    try
+        exportgraphics(axBottom,fileBottom,'Resolution',180);
+        if isfile(fileBottom),figureFiles{end+1}=fileBottom;end %#ok<AGROW>
+    catch ME
+        figureIssues{end+1}=['Accuracy comparison: ' ME.message]; %#ok<AGROW>
+    end
 end
 
 % Human-readable TXT: both technical model and data provenance.
@@ -161,7 +180,12 @@ if isfield(modelBundle,'developmentFsRange')
         modelBundle.developmentFsRange(1),modelBundle.developmentFsRange(2));
 end
 fl('Sampling rates computed from median timestamp differences, not assumed 20 Hz.');
-fl('No automatic unit conversion; consult meta.Units in source MAT.');
+fl('No automatic unit conversion. Read meta.Units or native PocketLab info.Units.');
+fl('PocketLab accelerometer unit g is validated; gyroscope native unit is NOT physically validated.');
+if isfield(R,'audit') && ~isempty(R.audit)
+    fprintf(fid,'Observed acceleration unit label: %s\\n',char(R.audit.AccelUnits(1)));
+    fprintf(fid,'Observed gyroscope unit label: %s\\n',char(R.audit.GyroUnits(1)));
+end
 fl(['Preprocessing: mild timestamp irregularity may be explicitly ' ...
     'linearly interpolated; unacceptable gaps cause an error.']);
 if isfield(R.cfg,'note'),fprintf(fid,'Profile note: %s\n',R.cfg.note);end
@@ -254,6 +278,18 @@ fprintf(fid,'Training comparison CSV: %s\n',[base '_training_comparison.csv']);
 fprintf(fid,'Independent comparison CSV: %s\n',[base '_independent_comparison.csv']);
 fprintf(fid,'Raw MAT copies folder: %s\n',rawFolder);
 fl('');
+fl('[PLOT IMAGE EXPORT STATUS]');
+if isempty(figureFiles)
+    fl('No plot PNG files exported (numerical results and raw MAT still saved).');
+else
+    for k=1:numel(figureFiles)
+        fprintf(fid,'Plot file: %s\n',figureFiles{k});
+    end
+end
+for k=1:numel(figureIssues)
+    fprintf(fid,'Plot export issue: %s\n',figureIssues{k});
+end
+fl('');
 fl('[LIMITATIONS AND ENGINEERING INTERPRETATION]');
 fl('1. The 2D/4D/8D/12D/16D comparisons share the same original trials.');
 fl('2. A very small holdout set produces coarse, unstable accuracy estimates.');
@@ -271,7 +307,8 @@ fl('END OF METADATA');
 outputs=struct('modelMAT',matFile,'metadataTXT',metadataPath, ...
     'featuresCSV',[base '_trial_features.csv'], ...
     'predictionsCSV',[base '_trial_predictions.csv'], ...
-    'rawDataFolder',rawFolder);
+    'rawDataFolder',rawFolder, ...
+    'figureFiles',{figureFiles},'figureIssues',{figureIssues});
 end
 
 function s=joinNumbers(values)
