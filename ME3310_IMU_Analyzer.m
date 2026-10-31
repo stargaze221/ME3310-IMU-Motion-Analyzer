@@ -457,12 +457,7 @@ refreshRank();
     end
     function tag=cleanFolderName(raw,fallback)
         tag=regexprep(strtrim(char(raw)),'[^a-zA-Z0-9]+','_');
-        tag=regexprep(tag,'^_+|_+
-        set(hInfo,'String',lines);
-        drawnow limitrate;
-    end
-end
-,'');
+        tag=regexprep(tag,'^_+|_+$','');
         if isempty(tag),tag=fallback;end
         if numel(tag)>30,tag=tag(1:30);end
     end
