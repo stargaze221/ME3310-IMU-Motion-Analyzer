@@ -88,18 +88,39 @@ end
 
 function tr=loadTrial(path,profile)
 if ~isfile(path),error('ME3310:MissingFile','File not found: %s',path);end
-info=whos('-file',path);
-names={info.name};
-required={'t','accel','gyro'};
-if ~all(ismember(required,names))
-    error('ME3310:MATSchema', ['MAT file needs t [Nx1], accel [Nx3], gyro [Nx3]. ' ...
-        'Both sensors are required in this lab. Found: %s'],strjoin(names,', '));
+vars=whos('-file',path);
+names={vars.name};
+isCanonical=all(ismember({'t','accel','gyro'},names));
+isPocketLab=all(ismember({'t','data'},names));
+if isCanonical
+    req={'t','accel','gyro'};
+    if ismember('meta',names),req{end+1}='meta';end
+    S=load(path,req{:});
+    t=double(S.t(:));
+    a=double(S.accel);
+    g=double(S.gyro);
+elseif isPocketLab
+    % Native PocketLab Voyager 2 Real-Time / decoded Memory MAT export:
+    %   t [Nx1], data.acceleration [Nx3], data.gyroscope [Nx3], info
+    % Do not fabricate a missing channel or interpret names as labels.
+    req={'t','data'};
+    if ismember('info',names),req{end+1}='info';end
+    S=load(path,req{:});
+    if ~isstruct(S.data) || ...
+            ~all(isfield(S.data,{'acceleration','gyroscope'}))
+        error('ME3310:MATSchema', ...
+            ['PocketLab MAT needs BOTH data.acceleration and ' ...
+             'data.gyroscope. Re-record with both sensor groups selected.']);
+    end
+    t=double(S.t(:));
+    a=double(S.data.acceleration);
+    g=double(S.data.gyroscope);
+else
+    error('ME3310:MATSchema', ...
+        ['Supported MAT layouts: (t,accel,gyro) OR PocketLab ' ...
+         '(t,data.acceleration,data.gyroscope). Found: %s'], ...
+         strjoin(names,', '));
 end
-req={'t','accel','gyro'};
-if ismember('meta',names),req{end+1}='meta';end
-S=load(path,req{:});
-t=double(S.t(:));
-a=double(S.accel);g=double(S.gyro);
 n=numel(t);
 if n<8 || any(~isfinite(t)) || any(diff(t)<=0)
     error('ME3310:Time','t must have >=8 finite, strictly increasing samples.');
@@ -151,7 +172,19 @@ tr.duration=tr.t(end);
 tr.n=n;
 tr.resampled=resampled;
 tr.meta=struct();
-if isfield(S,'meta') && isstruct(S.meta),tr.meta=S.meta;end
+if isfield(S,'meta') && isstruct(S.meta)
+    tr.meta=S.meta;
+end
+if isPocketLab && ~isCanonical
+    tr.meta.SourceFormat='PocketLab Voyager 2 native MAT';
+    tr.meta.TimestampNote=['Nominal stream time from driver; ' ...
+        'not verified device hardware timestamps.'];
+    if isfield(S,'info') && isstruct(S.info)
+        if isfield(S.info,'SampleCount')
+            tr.meta.DriverSampleCount=S.info.SampleCount;
+        end
+    end
+end
 tr.unitsAccel='not specified';tr.unitsGyro='not specified';
 if isfield(tr.meta,'Units') && isstruct(tr.meta.Units)
     if isfield(tr.meta.Units,'accel'),tr.unitsAccel=char(string(tr.meta.Units.accel));end
