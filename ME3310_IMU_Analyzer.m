@@ -284,6 +284,10 @@ refreshRank();
     end
     function rankByFisher(~,~)
       try
+        if ~isempty(importedBundle)
+            warndlg('The loaded Week 11 Fisher ranking is frozen; Week 12 is evaluation only.', ...
+                'Frozen model');return;
+        end
         if ~isempty(R)
             warndlg(['The held-out evaluation has already been viewed. ' ...
                 'Do not re-rank using the same holdout. For a new experiment, ' ...
@@ -307,6 +311,10 @@ refreshRank();
       end
     end
     function moveFeature(dir)
+        if ~isempty(importedBundle)
+            warndlg('Feature ranking is frozen after loading the Week 11 model.', ...
+                'Frozen model');return;
+        end
         if ~isempty(R)
             warndlg('Features are locked after viewing holdout results. New independent trials are needed to validate a revised selection.','Frozen selection');return;
         end
@@ -388,7 +396,9 @@ refreshRank();
             'devDetail',{{}},'holdDetail',{detail},'cfg',cfg, ...
             'rank',importedBundle.rank,'fs',fs,'audit',audit,'notes',notes);
         plotResults();
-        msg(sprintf('Week 12 independent validation: %d NEW recordings. Models/normalization were NOT retrained. Verify no copied or repeated baseline trials.',numel(y)));
+        msg({sprintf('Week 12: %d NEW recordings evaluated.',numel(y)), ...
+            'The Week 11 model, feature ranking, and normalization were NOT retrained.', ...
+            'Check that recordings are genuinely new, not copied or reused baseline trials.'});
       catch ME
         errordlg(ME.message,'Week 12 validation failed');msg(['ERROR: ' ME.message]);
       end
@@ -424,10 +434,16 @@ refreshRank();
                 maskV=(R.y==c & R.holdout);
                 if c==1,col=[.13 .46 .77];lab='Target';
                 else,col=[.89 .47 .21];lab='Confusing';end
-                scatter(axTop,Z(mask,1),Z(mask,2),70,col,'filled', ...
-                    'DisplayName',[lab ' train']);
-                scatter(axTop,Z(maskV,1),Z(maskV,2),100,col,'Marker','d', ...
-                    'LineWidth',1.6,'DisplayName',[lab ' heldout/new']);
+                if any(mask)
+                    scatter(axTop,Z(mask,1),Z(mask,2),70,col,'filled', ...
+                        'DisplayName',[lab ' train']);
+                end
+                if any(maskV)
+                    if any(R.train),subset=' heldout';
+                    else,subset=' NEW validation';end
+                    scatter(axTop,Z(maskV,1),Z(maskV,2),100,col,'Marker','d', ...
+                        'LineWidth',1.6,'DisplayName',[lab subset]);
+                end
             end
             xx=xlim(axTop); yy=ylim(axTop);
             if norm(first.w)>1e-12
@@ -442,7 +458,11 @@ refreshRank();
             xlim(axTop,xx);ylim(axTop,yy);grid(axTop,'on');
             xlabel(axTop,['Standardized ' R.cfg.names{ind(1)}],'Interpreter','none');
             ylabel(axTop,['Standardized ' R.cfg.names{ind(2)}],'Interpreter','none');
-            title(axTop,'2D linear classifier (circles = train; diamonds = independent)');
+            if any(R.train)
+                title(axTop,'2D classifier (circles = train; diamonds = heldout)');
+            else
+                title(axTop,'Frozen Week 11 2D classifier | NEW trials (diamonds)');
+            end
             legend(axTop,'Location','bestoutside','FontSize',7);
             hold(axTop,'off');
         end
@@ -451,8 +471,15 @@ refreshRank();
         bh(1).FaceColor=[.40 .57 .73];bh(2).FaceColor=[.89 .56 .28];
         ylim(axBottom,[0 105]);xticks(axBottom,[2 4 8 12 16]);
         xlabel(axBottom,'Number of selected features');ylabel(axBottom,'Correct trials (%)');
-        title(axBottom,sprintf('Trial-level accuracy | Independent evaluation n = %d',sum(R.holdout)));
-        legend(axBottom,{'Training','Independent'},'Location','southoutside','Orientation','horizontal');
+        if any(R.train)
+            subsetTitle=sprintf('Week 11 preliminary holdout n = %d',sum(R.holdout));
+            barLabels={'Week 11 train','Preliminary holdout'};
+        else
+            subsetTitle=sprintf('Week 12 NEW validation n = %d',sum(R.holdout));
+            barLabels={'Week 11 train','Week 12 NEW'};
+        end
+        title(axBottom,['Trial-level accuracy | ' subsetTitle]);
+        legend(axBottom,barLabels,'Location','southoutside','Orientation','horizontal');
         grid(axBottom,'on');
         lines=cell(1,5);
         for i=1:5
