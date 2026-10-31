@@ -47,7 +47,7 @@ mkbutton(pData,[.52 .067 .45 .075],'Load Saved Models',@loadModels);
 pFeat=uipanel(fig,'Title','2 | Fisher score and student feature ranking', ...
   'FontWeight','bold','Units','normalized','Position',[.012 .06 .36 .48], ...
   'BackgroundColor',[.96 .97 .985]);
-mktext(pFeat,[.03 .92 .45 .055],'Fisher score (TRAIN only)');
+hFisherLabel=mktext(pFeat,[.03 .92 .45 .055],'Fisher score (TRAIN only)');
 hFisher=uitable(pFeat,'Units','normalized','Position',[.03 .27 .45 .62], ...
   'ColumnName',{'ID','Fisher'},'ColumnWidth',{40 87}, ...
   'Data',[num2cell((1:16)'),repmat({'—'},16,1)]);
@@ -112,7 +112,9 @@ refreshRank();
         if get(hProfile,'Value')==1,profileName='PocketLab_20Hz';
         else,profileName='USC_HAD_100Hz';end
         R=[];importedBundle=[];modelBundle=[];rank=1:16;refreshRank();plotResults();
-        set(hFisher,'Data',[num2cell((1:16)'),repmat({'—'},16,1)]);
+        set(hTrials,'ColumnEditable',[false false true]);
+        set(hTrials,'ColumnFormat',{'char','char',{'Train','Holdout'}});
+        populateFrozenFisher([],false);
         msg('Profile changed. Re-analyze recordings before fitting a model.');
     end
     function addFiles(label)
@@ -132,13 +134,21 @@ refreshRank();
                 warndlg(['Already imported: ' ff{i}],'Duplicate file');continue;
             end
             count=sum([trials.label]==label);
-            role='Train';
-            if count>=2,role='Holdout';end
+            if ~isempty(importedBundle)
+                role='New Eval';
+            else
+                role='Train';
+                if count>=2,role='Holdout';end
+            end
             trials(end+1)=struct('path',path,'label',label,'role',role); %#ok<AGROW>
             existing{end+1}=path; %#ok<AGROW>
         end
         R=[];refreshTrialTable();plotResults();
-        msg(sprintf('%d original trials loaded; confirm class labels and split before analysis.',numel(trials)));
+        if ~isempty(importedBundle)
+            msg(sprintf('%d NEW validation trials loaded; frozen model will not be retrained.',numel(trials)));
+        else
+            msg(sprintf('%d original trials loaded; confirm class labels and split before analysis.',numel(trials)));
+        end
     end
     function refreshTrialTable()
         vals=cell(numel(trials),3);
@@ -150,6 +160,9 @@ refreshRank();
         set(hTrials,'Data',vals);
     end
     function editTrialRole(src,ev)
+        if ~isempty(importedBundle)
+            refreshTrialTable();return; % Week12 uses every imported trial for evaluation.
+        end
         if ~isempty(R)
             warndlg('Split identities are frozen after evaluation.','Frozen split');
             refreshTrialTable();return;
@@ -223,6 +236,9 @@ refreshRank();
     end
     function runFit(~,~)
       try
+        if ~isempty(importedBundle)
+            error('ME3310:Frozen','Week11 model loaded. Choose Evaluate NEW (Week12), not Fit + Eval.');
+        end
         if ~isempty(R)
             error('ME3310:Frozen','Already fitted and evaluated on these holdouts. Clear and collect NEW evaluation trials before new model-selection experiments.');
         end
@@ -320,6 +336,13 @@ refreshRank();
         set(hHop,'String',num2str(cfg.hopSeconds));
         rank=importedBundle.rank;refreshRank();
         trials=struct('path',{},'label',{},'role',{});refreshTrialTable();R=[];plotResults();
+        set(hTrials,'ColumnEditable',[false false false]);
+        set(hTrials,'ColumnFormat',{'char','char','char'});
+        if isfield(importedBundle,'fisherScores')
+            populateFrozenFisher(importedBundle.fisherScores,true);
+        else
+            populateFrozenFisher([],true);
+        end
         msg('Loaded FROZEN Week 11 models. Import NEW Target/Confusing recordings and click Evaluate NEW.');
     end
     function runWeek12(~,~)
@@ -351,9 +374,16 @@ refreshRank();
             error('ME3310:Leakage','A baseline MAT file was reimported! Validation requires new independent recordings.');
         end
         [res,detail]=ME3310_IMU_Core('evaluate',importedBundle.models,X,y,'Week 12 independent');
+        frozenFisher=nan(1,16);frozenTable=[];
+        if isfield(importedBundle,'fisherScores')
+            frozenFisher=importedBundle.fisherScores;
+        end
+        if isfield(importedBundle,'fisherTraining')
+            frozenTable=importedBundle.fisherTraining;
+        end
         R=struct('models',importedBundle.models,'X',X,'y',y, ...
             'train',false(size(y)),'holdout',true(size(y)), ...
-            'fisherScores',nan(1,16),'fisherTable',[], ...
+            'fisherScores',frozenFisher,'fisherTable',frozenTable, ...
             'dev',importedBundle.trainingSummary,'hold',res, ...
             'devDetail',{{}},'holdDetail',{detail},'cfg',cfg, ...
             'rank',importedBundle.rank,'fs',fs,'audit',audit,'notes',notes);
@@ -371,11 +401,20 @@ refreshRank();
             return;
         end
         models=R.models;first=models(1);
-        if get(hView,'Value')==2 && any(isfinite(R.fisherScores))
-            b=bar(axTop,1:16,R.fisherScores,'FaceColor',[.22 .49 .70]); %#ok<NASGU>
-            xlabel(axTop,'Feature index');ylabel(axTop,'Fisher score (TRAIN only)');
-            title(axTop,'Univariate Fisher score; undefined scores appear blank');
-            grid(axTop,'on');
+        if get(hView,'Value')==2
+            if any(isfinite(R.fisherScores))
+                b=bar(axTop,1:16,R.fisherScores,'FaceColor',[.22 .49 .70]); %#ok<NASGU>
+                xlabel(axTop,'Feature index');ylabel(axTop,'Fisher score (TRAIN only)');
+                if any(R.train)
+                    title(axTop,'Fisher scores: Week 11 TRAIN only');
+                else
+                    title(axTop,'FROZEN Week 11 TRAIN Fisher scores (not recalculated)');
+                end
+                grid(axTop,'on');
+            else
+                text(axTop,.05,.5,'Fisher scores unavailable in saved model.', ...
+                    'Units','normalized');
+            end
         else
             ind=first.indices;
             Z=(R.X(:,ind)-first.center)./first.scale;
@@ -454,6 +493,24 @@ refreshRank();
       catch ME
         errordlg(ME.message,'Export failed');msg(['ERROR: ' ME.message]);
       end
+    end
+    function populateFrozenFisher(scores,isFrozen)
+        if isFrozen
+            set(hFisherLabel,'String','Fisher (Week 11 TRAIN, frozen)');
+        else
+            set(hFisherLabel,'String','Fisher score (TRAIN only)');
+        end
+        values=[num2cell((1:16)'),repmat({'—'},16,1)];
+        if ~isempty(scores) && numel(scores)==16
+            for j=1:16
+                if isfinite(scores(j))
+                    values{j,2}=round(scores(j)*1000)/1000;
+                else
+                    values{j,2}='undefined';
+                end
+            end
+        end
+        set(hFisher,'Data',values);
     end
     function tag=cleanFolderName(raw,fallback)
         tag=regexprep(strtrim(char(raw)),'[^a-zA-Z0-9]+','_');
