@@ -183,8 +183,8 @@ fl('Sampling rates computed from median timestamp differences, not assumed 20 Hz
 fl('No automatic unit conversion. Read meta.Units or native PocketLab info.Units.');
 fl('PocketLab accelerometer unit g is validated; gyroscope native unit is NOT physically validated.');
 if isfield(R,'audit') && ~isempty(R.audit)
-    fprintf(fid,'Observed acceleration unit label: %s\\n',char(R.audit.AccelUnits(1)));
-    fprintf(fid,'Observed gyroscope unit label: %s\\n',char(R.audit.GyroUnits(1)));
+    fprintf(fid,'Observed acceleration unit label: %s\n',char(R.audit.AccelUnits(1)));
+    fprintf(fid,'Observed gyroscope unit label: %s\n',char(R.audit.GyroUnits(1)));
 end
 fl(['Preprocessing: mild timestamp irregularity may be explicitly ' ...
     'linearly interpolated; unacceptable gaps cause an error.']);
