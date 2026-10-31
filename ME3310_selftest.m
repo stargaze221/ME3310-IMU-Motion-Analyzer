@@ -23,6 +23,11 @@ assert(isequal([models.dimension],[2 4 8 12 16]),'Classifier dimensions error');
 [dev,~]=ME3310_IMU_Core('evaluate',models,X(train,:),y(train),'Training');
 [ind,~]=ME3310_IMU_Core('evaluate',models,X(test,:),y(test),'Heldout');
 assert(height(dev)==5 && height(ind)==5,'Evaluation table error');
+assert(strcmp(dev.Properties.VariableNames{1},'Dimension'), ...
+    'Summary table labels have changed unexpectedly');
+[~,heldoutDetails]=ME3310_IMU_Core('evaluate',models,X(test,:),y(test),'Heldout');
+assert(strcmp(heldoutDetails{1}.Properties.VariableNames{1},'TrialIndex'), ...
+    'MATLAB table must not use reserved dimension name Row');
 assert(all(dev.AccuracyPct>=0 & dev.AccuracyPct<=100));
 assert(all(ind.AccuracyPct>=0 & ind.AccuracyPct<=100));
 % Verify native PocketLab t/data/info MAT files match canonical features.
