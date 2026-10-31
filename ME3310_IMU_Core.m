@@ -183,6 +183,20 @@ if isPocketLab && ~isCanonical
         if isfield(S.info,'SampleCount')
             tr.meta.DriverSampleCount=S.info.SampleCount;
         end
+        % The PocketLab driver writes sensor names and units into info,
+        % whereas older student-format files use meta.Units.
+        if isfield(S.info,'Sensors') && isfield(S.info,'Units')
+            sensorNames=lower(string(S.info.Sensors(:)));
+            sensorUnits=string(S.info.Units(:));
+            if numel(sensorNames)==numel(sensorUnits)
+                ia=find(sensorNames=="acceleration",1);
+                ig=find(sensorNames=="gyroscope",1);
+                if ~isempty(ia) && ~isempty(ig)
+                    tr.meta.Units=struct('accel',char(sensorUnits(ia)), ...
+                        'gyro',char(sensorUnits(ig)));
+                end
+            end
+        end
     end
 end
 tr.unitsAccel='not specified';tr.unitsGyro='not specified';
