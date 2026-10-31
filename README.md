@@ -31,6 +31,31 @@ Frequency-domain details: at 20 Hz, Nyquist is 10 Hz and a 3-s window resolves v
 - `ME3310_generate_demo.m` — optional **synthetic** `.mat` files to test GUI import, distinct from experimental evidence.
 - `ME3310_selftest.m` — MATLAB unit/smoke test on synthetic data (must be run in MATLAB).
 
+## Quick import of PocketLab live recordings (no conversion)
+
+1. Capture 6-axis Acceleration + Gyroscope data with the PocketLab driver; files such as `fwd_pocketlab_live_20261031_085500_live.mat` are supported directly.
+2. From the Analyzer checkout in MATLAB run:
+
+```matlab
+repo = gitrepo; pull(repo); % run from the Analyzer's repository folder
+ME3310_selftest
+ME3310_IMU_Analyzer
+```
+
+3. Click **Import TARGET MAT** and select the three forward-walking MAT files together. Click **Import CONFUSING MAT** and select the three backward-walking files. The labels come from which button you press, never from filename prefixes.
+4. Mark one original recording per class **Holdout** before reviewing its results; use the remaining recordings for exploratory training. The holdout of one per class gives only descriptive preliminary results.
+5. For the 20-Hz PocketLab profile, start with 3.0-s windows and 0.5-s hops. Check the dashboard and export results.
+
+For a quick format inspection of a saved recording (do not need to move files):
+
+```matlab
+S=load('fwd_pocketlab_live_20261031_085500_live.mat');
+fieldnames(S.data)
+size(S.data.acceleration)
+size(S.data.gyroscope)
+numel(S.t)
+```
+
 ## Run
 
 1. Extract these `.m` files into **one folder**. In MATLAB, change Current Folder to that directory (or add it to the path).
@@ -46,7 +71,20 @@ Frequency-domain details: at 20 Hz, Nyquist is 10 Hz and a 3-s window resolves v
 
 ## Expected input MAT schema
 
-This follows the preexisting `examples/Student_IMU/load_student_trial.m` convention in the course GitHub repository:
+**Both source formats are supported directly. No manual conversion is needed.**
+
+**Format A — native PocketLab Voyager 2 Live/decoded output** (including `*_live.mat`):
+
+```matlab
+t                   % N x 1 nominal time, seconds
+data.acceleration   % N x 3, acceleration X/Y/Z
+data.gyroscope      % N x 3, angular velocity X/Y/Z
+info                % optional driver metadata
+```
+
+The original PocketLab file is imported directly into the Analyzer. The driver uses nominal timestamps rather than independently verified sensor hardware times. Check sample count and sensor units before interpretation.
+
+**Format B — standardized course trial** (same structure as the existing `examples/Student_IMU/load_student_trial.m` convention):
 
 ```matlab
 t         % N x 1 timestamps, elapsed seconds, strictly increasing
@@ -55,7 +93,7 @@ gyro      % N x 3 angular rate (X/Y/Z)
 meta      % OPTIONAL struct, e.g. meta.Units.accel and meta.Units.gyro
 ```
 
-All axes must share the same timestamps. `t` is in **seconds**. If actual PocketLab driver output is different, inspect `whos('-file','your_file.mat')` and update the adapter in `ME3310_IMU_Core.m` rather than misinterpreting columns. No missing channels are fabricated. A small amount of timestamp jitter is **explicitly interpolated** to an evenly spaced grid for PSD if no individual interval exceeds 1.5× the median interval; larger gaps cause an error. The tool does **not** silently convert unspecified units: verify the same acceleration/gyro units in every trial and between weeks.
+All axes must share the same timestamps. `t` is in **seconds**. If a MAT file is missing either acceleration or gyroscope, the Analyzer reports an error rather than replacing missing data. No missing channels are fabricated. A small amount of timestamp jitter is **explicitly interpolated** to an evenly spaced grid for PSD if no individual interval exceeds 1.5× the median interval; larger gaps cause an error. The tool does **not** silently convert unspecified units: verify the same acceleration/gyro units in every trial and between weeks.
 
 ## The 16 features
 
